@@ -1,0 +1,35 @@
+[package]
+name = "uptime_metrics_proxy"
+version = "0.1.0"
+edition = "2021"
+
+#[features]
+#rt-multi-thread = []
+
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
+
+[[bin]]
+name = "websocket"
+path = "src/websocket_parse.rs"
+
+#[[lib]]
+#name = "common"
+#path = "src/common"
+
+[dependencies]
+axum = { version = "0.7.5", features = ["tracing"] }
+dotenv = "0.15.0"
+reqwest = { version = "0.12.7", features = ["json"] }
+rust_socketio = { version = "0.6.0", features = ["async"] }
+tokio = { version = "1.39.3", features = ["full"] }
+serde_json = "1.0.127"
+futures-util = "0.3.30"
+serde = "1.0.209"
+tower-http = { version = "0.5.2", features = ["trace", "tracing"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry", "std"] }
+chrono = { version = "0.4.38", features = ["now"] }
+envconfig = "0.10.0"
