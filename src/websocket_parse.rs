@@ -1,15 +1,16 @@
-use crate::common::config::KumaConnectionConfig;
+use std::collections::HashMap;
+use std::fmt;
+
 use futures_util::FutureExt;
 use rust_socketio::{
     asynchronous::{Client, ClientBuilder},
     Payload, TransportType,
 };
 use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::fmt;
-use std::sync::Arc;
 use tokio::sync::broadcast::channel;
 use tokio::time;
+
+use crate::common::config::KumaConnectionConfig;
 
 pub enum ServiceReceiveError {
     Conn(rust_socketio::Error),
@@ -64,7 +65,7 @@ pub async fn get_services_info(
                 _ => (),
             }
         }
-        .boxed()
+            .boxed()
     };
 
     let socket_conn = ClientBuilder::new(config.socket_url.to_string())
@@ -101,7 +102,7 @@ pub async fn get_services_info(
                         _ => (),
                     }
                 }
-                .boxed()
+                    .boxed()
             },
         )
         .await;
@@ -114,7 +115,7 @@ pub async fn get_services_info(
         time::Duration::from_secs_f32(timeout),
         services_info_receiver.recv(),
     )
-    .await;
+        .await;
 
     if response.is_err() {
         return Err(ServiceReceiveError::Logic(format!(
@@ -172,12 +173,3 @@ pub fn build_tags_map(services: Vec<ServiceInfo>) -> TagMap {
     return tag_map;
 }
 
-#[tokio::main]
-async fn main() {
-    dotenv::dotenv().ok();
-    let config = Arc::new(KumaConnectionConfig::new());
-
-    let services = get_services_info(&config, 5.).await.unwrap();
-    let tag_map = build_tags_map(services);
-    println!("{:#?}", tag_map);
-}

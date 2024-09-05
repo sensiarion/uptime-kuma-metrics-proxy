@@ -10,15 +10,6 @@ edition = "2021"
 name = "api"
 path = "src/main.rs"
 
-
-[[bin]]
-name = "websocket"
-path = "src/websocket_parse.rs"
-
-#[[lib]]
-#name = "common"
-#path = "src/common"
-
 [dependencies]
 axum = { version = "0.7.5", features = ["tracing"] }
 dotenv = "0.15.0"
@@ -33,3 +24,4 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry", "std"] }
 chrono = { version = "0.4.38", features = ["now"] }
 envconfig = "0.10.0"
+axum-auth = "0.7.0"

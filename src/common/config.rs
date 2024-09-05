@@ -11,9 +11,7 @@ pub struct AppEnvConfig {
     pub tags_ttl_seconds: u32,
 
     #[envconfig(from = "METRICS_PROXY_KUMA_URL")]
-    pub url: String,
-    #[envconfig(from = "METRICS_PROXY_KUMA_TOKEN")]
-    pub token: String,
+    url: String,
     #[envconfig(from = "METRICS_PROXY_KUMA_LOGIN")]
     pub login: String,
     #[envconfig(from = "METRICS_PROXY_KUMA_PASSWORD")]
@@ -22,12 +20,9 @@ pub struct AppEnvConfig {
 
 #[derive(Clone, Envconfig)]
 pub struct KumaConnectionConfig {
-    pub url: String,
-    pub token: String,
+    pub url: Url,
     pub login: String,
     pub password: String,
-
-    pub full_url: Url,
     pub socket_url: Url,
 }
 
@@ -56,32 +51,35 @@ impl KumaConnectionConfig {
     pub fn new() -> KumaConnectionConfig {
         let env_config = AppEnvConfig::init_from_env().unwrap();
 
-        let mut full_url = Url::parse(env_config.url.clone().as_str()).unwrap();
-        let mut socket_url = full_url.clone();
+        let url = Url::parse(env_config.url.clone().as_str()).expect("Expected http or https url to your kuma instance");
+        if !["http", "https"].contains(&url.scheme()) {
+            panic!("Wrong scheme for url {}; expected one of http or https", url.to_string());
+        }
 
-        full_url
-            .set_password(Some(env_config.token.clone().as_str()))
-            .unwrap();
+        let mut socket_url = url.clone();
         socket_url.path_segments_mut().unwrap().clear();
         socket_url
             .path_segments_mut()
             .unwrap()
             .push("socket.io")
             .push("");
-        if full_url.scheme() == "https" {
-            socket_url
-                .set_scheme("wss")
-                .expect("Failed to set scheme onto socket url");
-        } else {
-            socket_url
-                .set_scheme("ws")
-                .expect("Failed to set scheme onto socket url");
+
+        match url.scheme() {
+            "https" => {
+                socket_url
+                    .set_scheme("wss")
+                    .expect("Failed to set scheme onto socket url");
+            }
+            "http" => {
+                socket_url
+                    .set_scheme("ws")
+                    .expect("Failed to set scheme onto socket url");
+            }
+            _ => { panic!("Wrong url protocol") }
         }
 
         KumaConnectionConfig {
-            url: env_config.url,
-            token: env_config.token,
-            full_url,
+            url,
             socket_url,
             login: env_config.login,
             password: env_config.password,

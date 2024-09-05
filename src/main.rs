@@ -1,26 +1,29 @@
-use crate::common::config::ApiConfig;
-use axum::extract::{MatchedPath, Path, State};
-use axum::http::{Request, StatusCode};
-use axum::{routing::get, Router};
+use std::sync::Arc;
+
+use axum::{Router, routing::get};
+use axum::extract::{MatchedPath};
+use axum::http::{Request};
 use chrono::{DateTime, Utc};
 use dotenv::dotenv;
 use reqwest::Url;
-use std::env;
-use std::fmt::{Display, Formatter};
-use std::future::Future;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::{RwLock, RwLockReadGuard};
-use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
-use tower_http::LatencyUnit;
+use tokio::sync::RwLock;
+use tower_http::trace::TraceLayer;
 use tracing::info_span;
 use tracing::Level;
+use tracing_subscriber::EnvFilter;
 
-mod websocket_parse;
+use crate::common::config::ApiConfig;
+use crate::errors::ServiceError;
+use crate::routes::get_filtered_metrics;
 use crate::websocket_parse::{build_tags_map, get_services_info, TagMap, TagName};
 
-pub mod common;
 use self::common::config::KumaConnectionConfig;
+
+mod websocket_parse;
+pub mod common;
+mod routes;
+mod errors;
+mod utils;
 
 type PrometheusFormattedMetrics = String;
 
@@ -42,21 +45,6 @@ async fn get_kuma_metrics(
     match response {
         Ok(response) => Ok(response.text().await.unwrap()),
         Err(err) => Err(err),
-    }
-}
-
-#[derive(Debug)]
-enum ServiceError {
-    UnknownTag(String),
-}
-
-impl Display for ServiceError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ServiceError::UnknownTag(text) => {
-                write!(f, "{}", text)
-            }
-        }
     }
 }
 
@@ -116,50 +104,6 @@ async fn update_tags_mapping(state: AppState, shared_state: SharedAppState) {
     }
 }
 
-async fn get_filtered_metrics(
-    State(shared_state): State<SharedAppState>,
-    tag: Option<Path<String>>,
-) -> (StatusCode, String) {
-    // TODO: pass auth info from url instead of config
-    let state_lock = shared_state.read().await;
-    let state = state_lock.clone();
-    drop(state_lock);
-
-    if (Utc::now() - state.update_at).num_seconds() > state.api_config.tags_ttl_seconds.into() {
-        tracing::info!("Tags mapping expired, fetching new...");
-        update_tags_mapping(state.clone(), shared_state).await
-    }
-
-    let metrics = get_kuma_metrics(state.kuma_config.full_url.clone()).await;
-
-    if metrics.is_err() {
-        return (
-            StatusCode::BAD_REQUEST,
-            format!(
-                "Failed to fetch data from {}. Err: {}",
-                state.kuma_config.url,
-                metrics.err().unwrap().to_string()
-            ),
-        );
-    }
-
-    if tag.is_none() {
-        // TODO logging
-        return (StatusCode::OK, metrics.unwrap());
-    }
-
-    let filtered_metrics = filter_metrics(metrics.unwrap(), tag.unwrap().0, state.tags_map.clone());
-
-    if filtered_metrics.is_err() {
-        let err_msg = filtered_metrics.err().unwrap().to_string();
-        return (
-            StatusCode::BAD_REQUEST,
-            format!("Failed to filter metrics. Reason: {}", err_msg),
-        );
-    }
-    return (StatusCode::OK, filtered_metrics.unwrap().to_string());
-}
-
 #[derive(Clone)]
 struct AppState {
     kuma_config: KumaConnectionConfig,
@@ -170,11 +114,49 @@ struct AppState {
 
 type SharedAppState = Arc<RwLock<AppState>>;
 
+// async fn log_requests(
+//     req: Request<Body>,
+//     next: Next,
+// ) -> Result<Response<Body>, axum::Error> {
+//     let start = Instant::now();
+//     let method = req.method().clone();
+//     let uri = req.uri().clone();
+//
+//     // Proceed with the request
+//     let response = next.run(req).await;
+//
+//     let status = response.status().as_u16();
+//     let duration = start.elapsed();
+//
+//     // Log access information
+//     tracing::info!(
+//         method = %method,
+//         uri = %uri,
+//         status = status,
+//         duration = ?duration,
+//         "Request completed"
+//     );
+//
+//     // Log error if status code is 4xx or 5xx
+//     if status >= 400 {
+//         tracing::error!(
+//             method = %method,
+//             uri = %uri,
+//             status = status,
+//             duration = ?duration,
+//             "Error occurred"
+//         );
+//     }
+//
+//     Ok(response)
+// }
+
 #[tokio::main]
 async fn main() {
     dotenv().ok();
     tracing_subscriber::fmt()
-        .with_max_level(Level::DEBUG)
+        .with_env_filter(EnvFilter::new("info"))
+        .with_max_level(Level::INFO)
         .init();
     // TODO access/err log
 
@@ -212,6 +194,7 @@ async fn main() {
                 )
             }),
         )
+        // .layer(middleware::from_fn(log_requests))
         .route("/:tag", get(get_filtered_metrics))
         .route("/", get(get_filtered_metrics))
         .with_state(Arc::new(RwLock::new(AppState {
@@ -221,7 +204,7 @@ async fn main() {
             api_config,
         })));
 
-    tracing::info!("Starting server at: {}", addr);
+    tracing::info!("Starting server at: http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, routes).await.unwrap();
 }
