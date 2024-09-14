@@ -13,20 +13,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Login to Docker Hub
+    - name: Login to docker hub
     - uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - uses: actions/checkout@v4
+        
+    - name: Bump version
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
+    - run: cargo install cargo-bump && cargo bump
+    
     - name: Build the Docker image
       run: |
-        cargo install cargo-bump && cargo bump
-        docker compose build
-        docker compose push server
+          docker compose build
+          docker compose push server
+      
     - name: Commit & Push changes
       uses: actions-js/push@master
       with:
