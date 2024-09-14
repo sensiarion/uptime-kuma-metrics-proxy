@@ -27,8 +27,10 @@ jobs:
         
           cargo install cargo-bump
           cargo bump -g # also creates commit and git tag
-        
-          VERSION=$(cargo pkgid | cut -d "#" -f2)
+          
+          # for some reason in runner cut produces uptime_metrics_proxy@0.1.2      
+          # not just 0.1.2 as locally      
+          VERSION=$(cargo pkgid | cut -d "#" -f2 | cut -d "@" -f2)
           echo "Bumped version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
