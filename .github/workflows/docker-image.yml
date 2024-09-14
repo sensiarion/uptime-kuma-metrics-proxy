@@ -20,18 +20,16 @@ jobs:
       with:
         toolchain: stable
 
-    - name: Bump version
+    - name: Bump and commit version
       run: |
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git config --global user.name 'github-actions[bot]'
         
           cargo install cargo-bump
-          cargo bump -g # also creates git tag
+          cargo bump -g # also creates commit and git tag
         
           VERSION=$(cargo pkgid | cut -d "#" -f2)
-          COMMIT_MESSAGE="Bump version $VERSION"
-        
-          echo "COMMIT_MESSAGE=$COMMIT_MESSAGE" >> $GITHUB_ENV
+          echo "Bumped version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Login into docker registry
@@ -44,11 +42,12 @@ jobs:
       run: |
           PACKAGE_NAME="sensiarion/uptime-kuma-metrics-proxy"
           docker compose build
+          echo "tagging $PACKAGE_NAME:latest as $PACKAGE_NAME:$VERSION"
           docker tag $PACKAGE_NAME:latest $PACKAGE_NAME:$VERSION
           docker push -a $PACKAGE_NAME
 
-    - name: Commit & Push changes
-      uses: actions-js/push@master
+    - name: Push changes
+      uses: ad-m/github-push-action@master
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        message: ${{ env.COMMIT_MESSAGE}}
+        branch: ${{ github.ref }}
