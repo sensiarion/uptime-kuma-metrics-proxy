@@ -14,28 +14,31 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-    
+
     - name: Install rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-    
+
     - name: Bump version
       run: |
           cargo install cargo-bump
-          cargo bump
-      
+          cargo bump -g
+          VERSION=$(cargo pkgid | cut -d "#" -f2)
+
     - name: Login into docker registry
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-        
+
     - name: Build the Docker image
       run: |
+          PACKAGE_NAME="sensiarion/uptime-kuma-metrics-proxy"
           docker compose build
-          docker compose push server
-      
+          docker tag $PACKAGE_NAME:latest $PACKAGE_NAME:$VERSION
+          docker push -a $PACKAGE_NAME
+
     - name: Commit & Push changes
       uses: actions-js/push@master
       with:

@@ -1,6 +1,6 @@
 services:
   server:
-    image: 'sensiarion/uptime-kuma-metrics-proxy'
+    image: 'sensiarion/uptime-kuma-metrics-proxy:latest'
     ports:
       - 3001:3001
 
