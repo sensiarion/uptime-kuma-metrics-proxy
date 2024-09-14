@@ -25,3 +25,4 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry",
 chrono = { version = "0.4.38", features = ["now"] }
 envconfig = "0.10.0"
 axum-auth = "0.7.0"
+openssl = { version = "0.10.66", features = ["vendored"] }
