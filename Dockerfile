@@ -15,11 +15,12 @@ COPY ./Cargo.toml ./Cargo.toml
 COPY ./src ./src
 RUN cargo build --release
 
-# our final base
-FROM rust:1.79 AS final
+# our final base: glibc + libgcc + CA certs only. Must match the glibc of the
+# build stage (rust:1.79 is bookworm), so no alpine/musl here; openssl is vendored.
+FROM gcr.io/distroless/cc-debian12 AS final
 
-# copy the build artifact from the build stage
-COPY --from=build /app/target/release/$PROJECT_NAME .
+# copy only the binary (ENV from the build stage is not visible here)
+COPY --from=build /app/target/release/api /api
 
 # set the startup command to run your binary
-CMD ["./api"]
+CMD ["/api"]
