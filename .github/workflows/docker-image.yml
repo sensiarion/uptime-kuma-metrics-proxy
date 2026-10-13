@@ -26,11 +26,16 @@ jobs:
           git config --global user.name 'github-actions[bot]'
         
           cargo install cargo-bump
-          cargo bump -g # also creates commit and git tag
-          
-          # for some reason in runner cut produces uptime_metrics_proxy@0.1.2      
-          # not just 0.1.2 as locally      
+          # no -g: `cargo bump -g` commits only Cargo.toml, so Cargo.lock lags one
+          # version behind and the next run's clean-tree check fails on it
+          cargo bump
+          cargo update -w
+
+          # for some reason in runner cut produces uptime_metrics_proxy@0.1.2
+          # not just 0.1.2 as locally
           VERSION=$(cargo pkgid | cut -d "#" -f2 | cut -d "@" -f2)
+          git commit -am "$VERSION"
+          git tag -am "$VERSION" "$VERSION"
           echo "Bumped version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
