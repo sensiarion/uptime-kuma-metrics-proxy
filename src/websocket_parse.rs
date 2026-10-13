@@ -32,7 +32,7 @@ impl fmt::Debug for ServiceReceiveError {
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct ServiceTag {
-    id: i32,
+    // No `id` (monitor_tag row id): Uptime Kuma 2.x no longer sends it in monitorList, and it was never used.
     name: String,
     tag_id: i32,
     value: String,
